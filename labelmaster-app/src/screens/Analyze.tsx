@@ -343,6 +343,28 @@ export default function Analyze() {
           </>
         )}
       </div>
+
+      {/* 자유/프리셋 질문 진행 중 — 전체 로딩 오버레이로 진행 상태를 명확히 표시 */}
+      {asking && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 50,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 14,
+            background: 'rgba(255,255,255,.82)',
+          }}
+        >
+          <Spinner />
+          <div style={{ fontSize: 14, fontWeight: 600, color: colors.grey600 }}>
+            질문을 확인하고 있어요…
+          </div>
+        </div>
+      )}
     </Screen>
   );
 }
