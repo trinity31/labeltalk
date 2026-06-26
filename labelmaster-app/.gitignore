@@ -17,3 +17,8 @@ yarn-error.log
 dist/
 *.ait
 .vscode
+
+# 생성된 통계 대시보드/히스토리 (scripts/ga4-report.mjs)
+analytics/
+# 서비스 계정 키
+*-service-account*.json

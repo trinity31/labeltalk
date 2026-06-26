@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "granite dev",
     "build": "ait build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "report": "node scripts/ga4-report.mjs"
   },
   "dependencies": {
     "@apps-in-toss/web-framework": "^2.4.5",
@@ -16,6 +17,7 @@
     "react-router-dom": "^7.9.5"
   },
   "devDependencies": {
+    "@google-analytics/data": "^4.12.0",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
