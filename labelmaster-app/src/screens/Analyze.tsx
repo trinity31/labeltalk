@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { colors } from '../lib/theme';
-import { Profile, loadProfile } from '../lib/profile';
-import { AnalyzeError, ExtractResult, SAMPLE_RESULT, extractIngredients } from '../lib/api';
-import { PRESETS, PresetKey, evaluatePreset, evaluateProfile } from '../lib/rules';
+import { Profile, loadProfile, loadRecentQuestions, addRecentQuestion } from '../lib/profile';
+import {
+  AnalyzeError,
+  ExtractResult,
+  SAMPLE_RESULT,
+  askCustomQuestion,
+  extractIngredients,
+} from '../lib/api';
+import { evaluateProfile } from '../lib/rules';
 import { Screen, Spinner } from '../components/ui';
 
 interface AnalyzeState {
@@ -24,11 +30,15 @@ export default function Analyze() {
   const [data, setData] = useState<ExtractResult | null>(null);
   const [status, setStatus] = useState<'loading' | 'done' | 'error'>('loading');
   const [rateLimited, setRateLimited] = useState(false);
+  const [customQ, setCustomQ] = useState('');
+  const [asking, setAsking] = useState(false);
+  const [recentQuestions, setRecentQuestions] = useState<string[]>([]);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       setProfile(await loadProfile());
+      setRecentQuestions(await loadRecentQuestions());
 
       const key = sample ? 'sample' : imageBase64 ?? '';
       // 같은 사진으로 되돌아온 경우 → 캐시 재사용, LLM 재호출 안 함
@@ -71,18 +81,36 @@ export default function Analyze() {
     };
   }, [imageBase64, sample]);
 
-  const goResult = useCallback(
-    (target: PresetKey | 'profile') => {
-      if (data == null) return;
-      const ev =
-        target === 'profile' && profile != null
-          ? evaluateProfile(data, profile)
-          : evaluatePreset(data, target as PresetKey);
-      navigate('/result', {
-        state: { ...ev, productName: data.name },
-      });
+  // 내 프로필 기준 확인 (룰 기반)
+  const checkProfile = useCallback(() => {
+    if (data == null || profile == null) return;
+    const ev = evaluateProfile(data, profile);
+    navigate('/result', { state: { ...ev, productName: data.name } });
+  }, [data, profile, navigate]);
+
+  // 자유 질문 (LLM) — 입력창 제출 또는 최근 질문 버튼에서 호출
+  const ask = useCallback(
+    async (question: string) => {
+      const q = question.trim();
+      if (data == null || q.length === 0 || asking) return;
+      try {
+        setAsking(true);
+        const ev = await askCustomQuestion(data.ingredients, q, data.name);
+        await addRecentQuestion(q); // 최근 질문에 저장
+        navigate('/result', {
+          state: { ...ev, basisLabel: q, productName: data.name },
+        });
+      } catch (e) {
+        alert(
+          e instanceof AnalyzeError && e.rateLimited
+            ? '지금 요청이 많아요. 잠시 후 다시 시도해 주세요.'
+            : '질문에 답하지 못했어요. 다시 시도해 주세요.'
+        );
+      } finally {
+        setAsking(false);
+      }
     },
-    [data, profile, navigate]
+    [data, asking, navigate]
   );
 
   const previewSrc =
@@ -190,7 +218,7 @@ export default function Analyze() {
             <div style={{ fontSize: 14, fontWeight: 700, marginTop: 22 }}>무엇이 궁금하세요?</div>
             {profile != null && (
               <button
-                onClick={() => goResult('profile')}
+                onClick={checkProfile}
                 style={{
                   width: '100%',
                   marginTop: 12,
@@ -214,25 +242,78 @@ export default function Analyze() {
             <div style={{ fontSize: 12, fontWeight: 600, color: colors.grey300, margin: '16px 0 10px' }}>
               또는 직접 질문하기
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
-              {PRESETS.map((p) => (
-                <button
-                  key={p.key}
-                  onClick={() => goResult(p.key)}
-                  style={{
-                    padding: '13px 14px',
-                    borderRadius: 12,
-                    border: `1px solid ${colors.line}`,
-                    background: colors.white,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: colors.ink,
-                  }}
-                >
-                  {p.label}
-                </button>
-              ))}
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <input
+                value={customQ}
+                onChange={(e) => setCustomQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') ask(customQ);
+                }}
+                placeholder="예: 땅콩 있어? 임산부가 먹어도 돼?"
+                disabled={asking}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: '13px 14px',
+                  borderRadius: 12,
+                  border: `1px solid ${colors.line}`,
+                  background: colors.white,
+                  fontSize: 14,
+                  color: colors.ink,
+                  outline: 'none',
+                }}
+              />
+              <button
+                onClick={() => ask(customQ)}
+                disabled={asking || customQ.trim().length === 0}
+                style={{
+                  flexShrink: 0,
+                  padding: '0 16px',
+                  borderRadius: 12,
+                  border: 'none',
+                  background: colors.primary,
+                  color: colors.white,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  opacity: asking || customQ.trim().length === 0 ? 0.5 : 1,
+                }}
+              >
+                {asking ? '…' : '질문'}
+              </button>
             </div>
+
+            {/* 최근에 한 질문 (사용자별, 최대 4개) */}
+            {recentQuestions.length > 0 && (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 600, color: colors.grey300, margin: '6px 0 10px' }}>
+                  최근 질문
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
+                  {recentQuestions.slice(0, 4).map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => ask(q)}
+                      disabled={asking}
+                      style={{
+                        padding: '13px 14px',
+                        borderRadius: 12,
+                        border: `1px solid ${colors.line}`,
+                        background: colors.white,
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: colors.ink,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             <button
               onClick={() => navigate(-1)}

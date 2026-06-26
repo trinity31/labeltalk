@@ -41,6 +41,14 @@ class LabelAnalysis(typing.TypedDict):
     flags_shellfish: list[str]  # 갑각류/해산물
     flags_additives: list[str]  # 식품첨가물(향료·감미료·보존료·착색료 등)
 
+
+# 자유 질문 응답 스키마 (askQuestion)
+class CustomAnswer(typing.TypedDict):
+    status: str  # "ok" | "warning" | "danger"
+    title: str  # 한 줄 결론
+    reasons: list[str]  # 판단 근거 (원재료/이유, 최대 3개)
+
+
 genai.configure(api_key=os.environ["API_KEY"])
 
 model = genai.GenerativeModel(
@@ -49,6 +57,16 @@ model = genai.GenerativeModel(
         response_mime_type="application/json",
         response_schema=LabelAnalysis,
         temperature=0,  # 원재료명을 변형 없이 그대로 전사하도록 결정적으로
+    ),
+)
+
+# 자유 질문용 텍스트 전용 모델
+qa_model = genai.GenerativeModel(
+    "gemini-2.5-flash",
+    generation_config=genai.GenerationConfig(
+        response_mime_type="application/json",
+        response_schema=CustomAnswer,
+        temperature=0.2,
     ),
 )
 
@@ -221,6 +239,68 @@ def analyzeImage(req: https_fn.Request) -> https_fn.Response:
 
     except Exception as e:
         print(f"Error analyzing image: {e}")
+        return https_fn.Response("Internal Server Error", status=500)
+
+
+@https_fn.on_request(
+    memory=options.MemoryOption.MB_256,
+    timeout_sec=60,
+    cors=options.CorsOptions(
+        cors_origins=["*"],
+        cors_methods=["GET", "POST", "PUT", "DELETE"],
+    ),
+)
+def askQuestion(req: https_fn.Request) -> https_fn.Response:
+    """이미 추출된 원재료에 대해 사용자의 자유 질문에 답해요 (텍스트 전용, 사진 재분석 없음)."""
+    try:
+        payload = req.get_json(silent=True) or {}
+        ingredients = payload.get("ingredients") or []
+        question = (payload.get("question") or "").strip()
+        product = (payload.get("product_name") or "").strip()
+
+        if not question:
+            return https_fn.Response("No question provided", status=400)
+        if not ingredients:
+            return https_fn.Response("No ingredients provided", status=400)
+
+        ingredient_text = ", ".join(str(i) for i in ingredients)
+        prompt = f"""
+        당신은 식품 라벨 도우미예요. 아래 '원재료'만을 근거로 사용자 질문에 답하세요.
+
+        제품명: {product or "(미상)"}
+        원재료: {ingredient_text}
+        질문: {question}
+
+        규칙:
+        - status 는 "ok"(괜찮아 보임) / "warning"(확인 필요·애매) / "danger"(피하는 게 좋음) 중 하나예요.
+        - 원재료에 정보가 없거나 애매하면 반드시 "warning" 으로 하세요. 알레르기·건강 관련은 절대 과감하게 "ok" 하지 마세요.
+        - title 은 한 줄 결론이에요. 짧고 자연스러운 한국어로. "안전합니다", "먹어도 됩니다" 같은 단정·보장 표현은 쓰지 마세요.
+        - reasons 는 판단 근거가 된 원재료나 이유를 최대 3개까지 넣어요. 없으면 빈 배열.
+        - 반드시 한국어로 답하세요.
+        """
+
+        last_err = None
+        for attempt in range(3):
+            try:
+                response = qa_model.generate_content(prompt)
+                return https_fn.Response(
+                    response.text, status=200, mimetype="application/json"
+                )
+            except Exception as e:
+                last_err = e
+                msg = str(e)
+                print(f"askQuestion attempt {attempt + 1}/3 failed: {e}")
+                if "429" in msg or "quota" in msg.lower() or "400" in msg:
+                    break
+
+        if last_err is not None and (
+            "429" in str(last_err) or "quota" in str(last_err).lower()
+        ):
+            return https_fn.Response("Rate limited: quota exceeded.", status=429)
+        raise last_err
+
+    except Exception as e:
+        print(f"Error answering question: {e}")
         return https_fn.Response("Internal Server Error", status=500)
 
 

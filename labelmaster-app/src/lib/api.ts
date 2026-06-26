@@ -2,6 +2,8 @@
 // 지역/프로젝트가 바뀌면 이 URL만 교체하면 됩니다.
 export const ANALYZE_URL =
   'https://us-central1-label-wizard-co50gj.cloudfunctions.net/analyzeImage';
+// 자유 질문 응답 (이미 추출된 원재료 재사용, 사진 재분석 없음)
+export const ASK_URL = ANALYZE_URL.replace('analyzeImage', 'askQuestion');
 
 // LLM이 의미로 분류한 카테고리별 위험 성분 — 키워드 표에 없는 성분까지 포착해요.
 export interface RiskFlags {
@@ -116,6 +118,36 @@ function normalizeIngredients(value: unknown): string[] {
       .filter(Boolean);
   }
   return [];
+}
+
+export interface CustomEvaluation {
+  verdict: 'ok' | 'warning' | 'danger';
+  title: string;
+  reasons: string[];
+}
+
+// 자유 질문에 대한 LLM 응답 — 이미 추출된 원재료를 보내 사진 재분석 없이 답해요.
+export async function askCustomQuestion(
+  ingredients: string[],
+  question: string,
+  productName: string
+): Promise<CustomEvaluation> {
+  const res = await fetch(ASK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ingredients, question, product_name: productName }),
+  });
+  if (!res.ok) {
+    throw new AnalyzeError(`질문 응답 오류 (${res.status})`, res.status === 429);
+  }
+  const data = parseLoose(await res.text());
+  const status = typeof data.status === 'string' ? data.status : 'warning';
+  const verdict = status === 'ok' || status === 'danger' ? status : 'warning';
+  return {
+    verdict,
+    title: typeof data.title === 'string' && data.title ? data.title : '확인이 필요해요',
+    reasons: normalizeIngredients(data.reasons),
+  };
 }
 
 // 샘플 사진 체험용 — 목업 F3의 예시 원재료. 네트워크 없이도 데모가 돌아가요.

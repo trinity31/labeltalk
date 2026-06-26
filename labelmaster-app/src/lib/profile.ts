@@ -63,6 +63,29 @@ export async function clearProfile(): Promise<void> {
   await Storage.removeItem(STORAGE_KEY);
 }
 
+// 최근 직접 질문 (사용자별 로컬 저장) — 최신순, 최대 8개 저장
+const RECENT_Q_KEY = 'labelmaster:recentQuestions:v1';
+
+export async function loadRecentQuestions(): Promise<string[]> {
+  try {
+    const raw = await Storage.getItem(RECENT_Q_KEY);
+    if (raw == null) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function addRecentQuestion(question: string): Promise<string[]> {
+  const q = question.trim();
+  if (q.length === 0) return loadRecentQuestions();
+  const cur = await loadRecentQuestions();
+  const next = [q, ...cur.filter((x) => x !== q)].slice(0, 8);
+  await Storage.setItem(RECENT_Q_KEY, JSON.stringify(next));
+  return next;
+}
+
 // 메인 홈의 프로필 요약 문구 (예: "비건 · 우유 알레르기 · 글루텐 제한")
 export function profileSummary(profile: Profile): string {
   const parts: string[] = [];
