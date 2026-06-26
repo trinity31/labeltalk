@@ -1,0 +1,14 @@
+*.local
+
+# 환경변수 / 시크릿 (API_KEY 등) — 절대 커밋 금지
+.env
+.env.*
+!.env.example
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# 로그
+*.log

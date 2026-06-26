@@ -1,0 +1,32 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Pretendard', -apple-system, system-ui, sans-serif;
+  color: #18181b;
+  background: #ffffff;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input {
+  font-family: inherit;
+}
+
+/* 스크롤바 숨김 */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
