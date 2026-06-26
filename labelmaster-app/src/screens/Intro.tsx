@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { colors } from '../lib/theme';
+import { track } from '../lib/analytics';
 import { PrimaryButton, Screen } from '../components/ui';
 
 const STEPS = [
@@ -104,7 +105,10 @@ export default function Intro() {
       <div style={{ padding: '12px 22px 30px', background: colors.white }}>
         <PrimaryButton
           title="시작하기"
-          onPress={() => navigate('/onboarding')}
+          onPress={() => {
+            track('intro_start');
+            navigate('/onboarding');
+          }}
           style={{ padding: 17 }}
         />
       </div>

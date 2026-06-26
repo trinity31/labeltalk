@@ -11,6 +11,7 @@ import {
 } from '../lib/api';
 import { evaluateProfile } from '../lib/rules';
 import { runWithRewardedAd } from '../lib/ads';
+import { track } from '../lib/analytics';
 import { Screen, Spinner } from '../components/ui';
 
 interface AnalyzeState {
@@ -67,13 +68,16 @@ export default function Analyze() {
         // 실제 사진 분석(LLM)에는 보상형 광고를 함께 노출해요. (샘플·캐시 히트는 제외)
         const result = await runWithRewardedAd(() => extractIngredients(imageBase64));
         extractionCache = { key, data: result };
+        track('analyze_done', { ingredient_count: result.ingredients.length });
         if (alive) {
           setData(result);
           setStatus('done');
         }
       } catch (e) {
+        const limited = e instanceof AnalyzeError && e.rateLimited;
+        track('analyze_error', { rate_limited: limited });
         if (alive) {
-          setRateLimited(e instanceof AnalyzeError && e.rateLimited);
+          setRateLimited(limited);
           setStatus('error');
         }
       }
@@ -87,6 +91,7 @@ export default function Analyze() {
   const checkProfile = useCallback(() => {
     if (data == null || profile == null) return;
     const ev = evaluateProfile(data, profile);
+    track('profile_check', { verdict: ev.verdict });
     navigate('/result', { state: { ...ev, productName: data.name } });
   }, [data, profile, navigate]);
 
@@ -102,6 +107,7 @@ export default function Analyze() {
           askCustomQuestion(data.ingredients, q, data.name, profile?.sensitivityLevel ?? 'normal')
         );
         await addRecentQuestion(q); // 최근 질문에 저장
+        track('custom_question', { verdict: ev.verdict });
         navigate('/result', {
           state: { ...ev, basisLabel: q, productName: data.name },
         });

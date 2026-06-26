@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '../lib/theme';
 import { Profile, loadProfile, profileSummary } from '../lib/profile';
+import { track } from '../lib/analytics';
 import { PrimaryButton, OutlineButton, Screen, Spinner } from '../components/ui';
 
 export default function Home() {
@@ -41,6 +42,7 @@ export default function Home() {
       }
       const photos = await fetchAlbumPhotos({ maxCount: 1, maxWidth: 720, base64: true });
       if (!photos || photos.length === 0) return;
+      track('photo_pick');
       navigate('/analyze', { state: { imageBase64: photos[0].dataUri } });
     } catch {
       alert('사진을 불러오지 못했어요. 다시 시도해 주세요.');
@@ -157,7 +159,13 @@ export default function Home() {
           />
         </div>
         <div style={{ marginTop: 10 }}>
-          <OutlineButton title="샘플 사진으로 체험하기" onPress={() => navigate('/analyze', { state: { sample: true } })} />
+          <OutlineButton
+            title="샘플 사진으로 체험하기"
+            onPress={() => {
+              track('sample_view');
+              navigate('/analyze', { state: { sample: true } });
+            }}
+          />
         </div>
 
         <div

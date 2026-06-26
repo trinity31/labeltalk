@@ -10,6 +10,7 @@ import {
   loadProfile,
   saveProfile,
 } from '../lib/profile';
+import { track } from '../lib/analytics';
 import { Chip, PrimaryButton, Segmented, Toggle, SectionTitle, Screen } from '../components/ui';
 
 function toggle(list: string[], id: string): string[] {
@@ -59,6 +60,23 @@ export default function Onboarding() {
       sensitivityLevel: sensitivity,
       checkCrossContamination: crossContam,
     });
+    track('profile_saved', {
+      is_edit: isEdit,
+      allergy_count: allergies.length,
+      restriction_count: restrictions.length,
+      avoid_count: avoid.length,
+      sensitivity,
+    });
+    // 항목별 분포 분석용 — 선택한 값마다 1건씩 보내 GA4에서 value 기준으로 집계해요.
+    const labelOf = (opts: readonly { id: string; label: string }[], id: string) =>
+      opts.find((o) => o.id === id)?.label ?? id;
+    allergies.forEach((id) =>
+      track('profile_item', { type: 'allergy', value: id, label: labelOf(ALLERGY_OPTIONS, id) })
+    );
+    restrictions.forEach((id) =>
+      track('profile_item', { type: 'restriction', value: id, label: labelOf(RESTRICTION_OPTIONS, id) })
+    );
+    avoid.forEach((v) => track('profile_item', { type: 'avoid', value: v, label: v }));
     navigate('/', { replace: true });
   };
 

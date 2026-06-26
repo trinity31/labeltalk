@@ -1,6 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { colors, verdictStyle, Verdict, DISCLAIMER } from '../lib/theme';
+import { track } from '../lib/analytics';
 import { Screen } from '../components/ui';
 
 interface ResultState {
@@ -15,6 +16,10 @@ export default function Result() {
   const navigate = useNavigate();
   const state = useLocation().state as ResultState | null;
 
+  useEffect(() => {
+    if (state != null) track('result_view', { verdict: state.verdict });
+  }, [state]);
+
   if (state == null) {
     navigate('/', { replace: true });
     return null;
@@ -25,6 +30,7 @@ export default function Result() {
   const hasReasons = reasons.length > 0;
 
   const onShare = useCallback(async () => {
+    track('share_clicked', { verdict });
     const flatTitle = title.replace(/\n/g, ' ');
     const message = [
       '이거먹어도돼? 결과',
@@ -44,7 +50,7 @@ export default function Result() {
     } catch {
       /* 공유 취소/실패 시에도 앱이 멈추지 않도록 무시 */
     }
-  }, [title, v.icon, hasReasons, reasons]);
+  }, [title, v.icon, hasReasons, reasons, verdict]);
 
   return (
     <Screen>
