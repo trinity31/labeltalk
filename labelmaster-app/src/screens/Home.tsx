@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { colors } from '../lib/theme';
 import { Profile, loadProfile, profileSummary } from '../lib/profile';
 import { track } from '../lib/analytics';
-import { PrimaryButton, OutlineButton, Screen, Spinner } from '../components/ui';
+import { PrimaryButton, Screen, Spinner } from '../components/ui';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -149,22 +149,16 @@ export default function Home() {
           <div style={{ fontSize: 13, color: colors.grey500, marginTop: 5 }}>
             원재료표가 잘 보이게 찍어주세요
           </div>
+          <div style={{ fontSize: 12, color: colors.grey300, marginTop: 7 }}>
+            🎬 분석 시 짧은 광고가 표시돼요
+          </div>
         </div>
 
         <div style={{ marginTop: 14 }}>
           <PrimaryButton
-            title={picking ? '불러오는 중…' : '사진 올리기'}
+            title={picking ? '불러오는 중…' : '광고 보고 분석하기'}
             onPress={handlePick}
             disabled={picking}
-          />
-        </div>
-        <div style={{ marginTop: 10 }}>
-          <OutlineButton
-            title="샘플 사진으로 체험하기"
-            onPress={() => {
-              track('sample_view');
-              navigate('/analyze', { state: { sample: true } });
-            }}
           />
         </div>
 
@@ -181,6 +175,22 @@ export default function Home() {
           <br />
           실제 라벨을 꼭 확인해 주세요.
         </div>
+
+        <button
+          onClick={() => navigate('/intro')}
+          style={{
+            display: 'block',
+            margin: '14px auto 4px',
+            background: 'none',
+            border: 'none',
+            fontSize: 13,
+            fontWeight: 600,
+            color: colors.grey400,
+            textDecoration: 'underline',
+          }}
+        >
+          튜토리얼 다시 보기
+        </button>
       </div>
     </Screen>
   );
