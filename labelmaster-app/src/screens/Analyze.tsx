@@ -10,6 +10,7 @@ import {
   extractIngredients,
 } from '../lib/api';
 import { evaluateProfile } from '../lib/rules';
+import { runWithRewardedAd } from '../lib/ads';
 import { Screen, Spinner } from '../components/ui';
 
 interface AnalyzeState {
@@ -63,7 +64,8 @@ export default function Analyze() {
           if (alive) setStatus('error');
           return;
         }
-        const result = await extractIngredients(imageBase64);
+        // 실제 사진 분석(LLM)에는 보상형 광고를 함께 노출해요. (샘플·캐시 히트는 제외)
+        const result = await runWithRewardedAd(() => extractIngredients(imageBase64));
         extractionCache = { key, data: result };
         if (alive) {
           setData(result);
@@ -95,7 +97,10 @@ export default function Analyze() {
       if (data == null || q.length === 0 || asking) return;
       try {
         setAsking(true);
-        const ev = await askCustomQuestion(data.ingredients, q, data.name);
+        // 자유 질문(LLM)에도 보상형 광고를 함께 노출해요.
+        const ev = await runWithRewardedAd(() =>
+          askCustomQuestion(data.ingredients, q, data.name, profile?.sensitivityLevel ?? 'normal')
+        );
         await addRecentQuestion(q); // 최근 질문에 저장
         navigate('/result', {
           state: { ...ev, basisLabel: q, productName: data.name },

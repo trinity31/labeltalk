@@ -186,7 +186,8 @@ def analyzeImage(req: https_fn.Request) -> https_fn.Response:
            IMPORTANT: include ingredients even if their names are uncommon or not obviously named — judge by what the ingredient actually is, not just by keyword.
            - flags_non_vegan: ONLY ingredients that are DEFINITELY animal-derived (milk, egg, gelatin, honey, meat/fish, carmine, shellac, etc.).
              Do NOT put minerals/salts here (e.g. 제삼인산칼슘/calcium phosphate, 탄산칼슘, 식염/salt), nor plant proteins (완두단백/pea protein), nor plant-derived lecithin (유채레시틴), nor plain plant ingredients. These are vegan-OK — leave them out.
-           - flags_vegan_ambiguous: ingredients whose source could be EITHER animal OR plant and need checking (e.g. 천연향료/natural flavor, 비타민D3, mono-/di-glycerides, enzymes). Put uncertain-source items here, NOT in flags_non_vegan.
+           - flags_vegan_ambiguous: ingredients whose source could genuinely be EITHER animal OR plant and need checking (e.g. 천연향료/natural flavor, 비타민D3, mono-/di-glycerides, enzymes). Put uncertain-source items here, NOT in flags_non_vegan.
+             IMPORTANT: Do NOT flag common staples that are practically vegan — 설탕/sugar, 소금/salt, 밀가루/flour, 전분/starch, 식물성 기름/plant oils, 식초/vinegar, 고추장, 된장, 간장, 고춧가루, 쌀/현미 등은 비건으로 간주하고 비우세요. Judge ingredients as commonly produced; do NOT flag something merely because of rare processing methods (e.g. bone-char-refined sugar) or theoretical trace contamination. Only flag when the ingredient itself has a real uncertain animal-vs-plant origin.
            - flags_gluten: wheat/barley/rye/malt or other gluten-containing/likely ingredients
            - flags_milk: milk or dairy-derived ingredients
            - flags_egg: egg-derived ingredients
@@ -257,11 +258,19 @@ def askQuestion(req: https_fn.Request) -> https_fn.Response:
         ingredients = payload.get("ingredients") or []
         question = (payload.get("question") or "").strip()
         product = (payload.get("product_name") or "").strip()
+        sensitivity = (payload.get("sensitivity") or "normal").strip()
 
         if not question:
             return https_fn.Response("No question provided", status=400)
         if not ingredients:
             return https_fn.Response("No ingredients provided", status=400)
+
+        if sensitivity == "light":
+            sensitivity_rule = "사용자 민감도는 '가볍게'예요. 명확한 근거가 있을 때만 위험으로 판단하고, 미량 혼입·가공방식 같은 이론적 가능성은 무시하세요. 애매하면 관대하게 ok 쪽으로."
+        elif sensitivity == "strict":
+            sensitivity_rule = "사용자 민감도는 '매우 민감'이에요. 조금이라도 의심되면 보수적으로 warning 이상으로 판단하세요."
+        else:
+            sensitivity_rule = "사용자 민감도는 '보통'이에요. 균형 있게 판단하세요."
 
         ingredient_text = ", ".join(str(i) for i in ingredients)
         prompt = f"""
@@ -273,7 +282,8 @@ def askQuestion(req: https_fn.Request) -> https_fn.Response:
 
         규칙:
         - status 는 "ok"(괜찮아 보임) / "warning"(확인 필요·애매) / "danger"(피하는 게 좋음) 중 하나예요.
-        - 원재료에 정보가 없거나 애매하면 반드시 "warning" 으로 하세요. 알레르기·건강 관련은 절대 과감하게 "ok" 하지 마세요.
+        - {sensitivity_rule}
+        - 알레르기·건강과 직결된 명확한 위험은 민감도와 무관하게 보수적으로 알려주세요. 단, 흔한 식물성 기본 재료(설탕·소금·밀가루·전분·식물성 기름·식초·고추장·된장·간장·고춧가루·쌀 등)는 비건으로 간주하고, "미량 혼입 가능"이나 "가공 방식" 같은 이론적 가능성만으로 위험하다고 하지 마세요.
         - title 은 한 줄 결론이에요. 짧고 자연스러운 한국어로. "안전합니다", "먹어도 됩니다" 같은 단정·보장 표현은 쓰지 마세요.
         - reasons 는 판단 근거가 된 원재료나 이유를 최대 3개까지 넣어요. 없으면 빈 배열.
         - 반드시 한국어로 답하세요.

@@ -130,12 +130,13 @@ export interface CustomEvaluation {
 export async function askCustomQuestion(
   ingredients: string[],
   question: string,
-  productName: string
+  productName: string,
+  sensitivity: string = 'normal'
 ): Promise<CustomEvaluation> {
   const res = await fetch(ASK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ingredients, question, product_name: productName }),
+    body: JSON.stringify({ ingredients, question, product_name: productName, sensitivity }),
   });
   if (!res.ok) {
     throw new AnalyzeError(`질문 응답 오류 (${res.status})`, res.status === 429);
