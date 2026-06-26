@@ -122,7 +122,7 @@ export default function Analyze() {
 
   return (
     <Screen>
-      <div style={{ flex: 1, overflow: 'auto', padding: '60px 22px 24px' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '24px 22px 24px' }}>
         <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.5 }}>원재료를 읽었어요</div>
 
         <div style={{ marginTop: 16, borderRadius: 16, overflow: 'hidden', height: 148 }}>

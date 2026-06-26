@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { colors } from '../lib/theme';
 import {
@@ -7,6 +7,7 @@ import {
   SENSITIVITY_OPTIONS,
   SensitivityLevel,
   emptyProfile,
+  loadProfile,
   saveProfile,
 } from '../lib/profile';
 import { Chip, PrimaryButton, Segmented, Toggle, SectionTitle, Screen } from '../components/ui';
@@ -23,6 +24,25 @@ export default function Onboarding() {
   const [draft, setDraft] = useState('');
   const [sensitivity, setSensitivity] = useState<SensitivityLevel>('strict');
   const [crossContam, setCrossContam] = useState(true);
+  const [isEdit, setIsEdit] = useState(false);
+
+  // 수정 진입 시 저장된 프로필을 불러와 채워요. (첫 설정이면 위 기본값 유지)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const p = await loadProfile();
+      if (!alive || p == null) return;
+      setAllergies(p.allergies);
+      setRestrictions(p.restrictions);
+      setAvoid(p.avoidIngredients);
+      setSensitivity(p.sensitivityLevel);
+      setCrossContam(p.checkCrossContamination);
+      setIsEdit(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const addAvoid = () => {
     const v = draft.trim();
@@ -44,9 +64,9 @@ export default function Onboarding() {
 
   return (
     <Screen>
-      <div style={{ flex: 1, overflow: 'auto', padding: '60px 22px 16px' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '24px 22px 16px' }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: colors.primary, letterSpacing: 0.4 }}>
-          STEP 1 · 프로필 설정
+          {isEdit ? '프로필 수정' : 'STEP 1 · 프로필 설정'}
         </div>
         <div style={{ fontSize: 25, fontWeight: 800, letterSpacing: -0.6, marginTop: 8, lineHeight: '33px', color: colors.ink }}>
           피해야 할 성분을
@@ -158,7 +178,7 @@ export default function Onboarding() {
           background: colors.white,
         }}
       >
-        <PrimaryButton title="저장하고 시작하기" onPress={onSave} />
+        <PrimaryButton title={isEdit ? '저장하기' : '저장하고 시작하기'} onPress={onSave} />
       </div>
     </Screen>
   );

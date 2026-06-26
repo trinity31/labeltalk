@@ -11,45 +11,75 @@ const ALLERGY_FLAG: Record<string, keyof RiskFlags> = {
   milk: 'milk',
   egg: 'egg',
   tree_nuts: 'nuts',
+  peanut: 'nuts',
   wheat: 'gluten',
   soy: 'soy',
   shellfish: 'shellfish',
 };
 
 // PRD 8.2 — 보수적 판단을 위한 키워드 테이블.
-// 위험(❌급)과 주의(⚠️급) 키워드를 분리해서, 애매하면 무조건 ⚠️ 원칙을 지켜요.
-
 const MILK = ['우유', '유제품', '분유', '전지분유', '탈지분유', '유청', '버터', '치즈', '크림', '카제인', '카세인', '락토'];
 const EGG = ['계란', '달걀', '난백', '난황', '전란', '난류'];
-const NUTS = ['견과', '아몬드', '호두', '캐슈', '땅콩', '피스타치오', '마카다미아', '헤이즐넛', '잣'];
+const NUTS = ['견과', '아몬드', '호두', '캐슈', '피스타치오', '마카다미아', '헤이즐넛', '잣'];
+const PEANUT = ['땅콩', '낙화생'];
 const WHEAT_GLUTEN = ['밀', '밀가루', '소맥', '소맥분', '글루텐', '보리', '맥아', '맥아추출물', '호밀'];
+const BUCKWHEAT = ['메밀'];
 const SOY = ['대두', '콩', '간장', '된장', '두부', '레시틴'];
-const SHELLFISH = ['새우', '게', '가재', '랍스터', '조개', '굴', '오징어', '문어', '갑각', '어패'];
+const SHELLFISH = ['새우', '게', '가재', '랍스터', '조개', '굴', '오징어', '문어', '갑각', '어패', '홍합', '전복'];
+const MACKEREL = ['고등어'];
+const PORK = ['돼지', '돈육', '라드', '베이컨', '햄'];
+const BEEF = ['쇠고기', '소고기', '우육', '사골'];
+const CHICKEN = ['닭', '계육', '치킨'];
+const PEACH = ['복숭아'];
+const TOMATO = ['토마토'];
+const SULFITES = ['아황산', '메타중아황산', '이산화황'];
+
+// 식이제한용 — 육류/해산물 묶음
+const MEAT = ['쇠고기', '소고기', '우육', '사골', '돼지고기', '돈육', '닭고기', '계육', '오리고기', '양고기', '육수', '젤라틴', '라드', '베이컨', '햄', '소시지', '벌꿀', '꿀'];
+const SEAFOOD = ['생선', '어육', '멸치', '가다랑어', '참치', '연어', '고등어', '명태', '대구', '액젓', '젓갈', '새우', '게', '오징어', '문어', '낙지', '조개', '굴', '홍합', '전복', '어묵', '맛살'];
 
 // 알레르기 id → 위험 키워드
 const ALLERGY_KEYWORDS: Record<string, string[]> = {
   milk: MILK,
   egg: EGG,
   tree_nuts: NUTS,
+  peanut: PEANUT,
   wheat: WHEAT_GLUTEN,
+  buckwheat: BUCKWHEAT,
   soy: SOY,
   shellfish: SHELLFISH,
+  mackerel: MACKEREL,
+  pork: PORK,
+  beef: BEEF,
+  chicken: CHICKEN,
+  peach: PEACH,
+  tomato: TOMATO,
+  sulfites: SULFITES,
 };
 
 // 비건 위반 — 명확한 동물성(❌급)
-const VEGAN_BLOCK = [
-  ...MILK, ...EGG,
-  '벌꿀', '꿀', '젤라틴', '육수', '쇠고기', '소고기', '돼지고기', '닭고기',
-  '어육', '생선', '멸치', '가다랑어', '액젓', '젓갈', '라드',
-];
+const VEGAN_BLOCK = [...MILK, ...EGG, ...MEAT, ...SEAFOOD];
 // 비건 — 출처 불명(⚠️급)
 const VEGAN_WARN = ['향료', '천연향료', '유화제'];
 
 // 식이제한 id → { block, warn }
 const RESTRICTION_KEYWORDS: Record<string, { block: string[]; warn: string[] }> = {
-  vegan: { block: VEGAN_BLOCK, warn: VEGAN_WARN },
-  lactose_free: { block: MILK, warn: [] },
-  gluten_free: { block: WHEAT_GLUTEN, warn: [] }, // 글루텐은 안전 오답 위험 → 발견 시 보수적으로 주의 이상
+  vegan: { block: VEGAN_BLOCK, warn: VEGAN_WARN }, // 동물성 전부
+  lacto: { block: [...EGG, ...MEAT, ...SEAFOOD], warn: [] }, // 유제품 OK
+  lacto_ovo: { block: [...MEAT, ...SEAFOOD], warn: [] }, // 유제품·계란 OK
+  ovo: { block: [...MILK, ...MEAT, ...SEAFOOD], warn: [] }, // 계란 OK
+  pesco: { block: [...MEAT], warn: [] }, // 해산물·유제품·계란 OK, 육류만 제한
+  gluten_free: { block: WHEAT_GLUTEN, warn: [] },
+};
+
+// 식이제한 id → LLM 플래그 (키워드 보완). 육/해산물은 LLM 전용 플래그가 없어 키워드로만 봐요.
+const RESTRICTION_FLAG: Record<string, (keyof RiskFlags)[]> = {
+  vegan: ['non_vegan'],
+  lacto: ['egg'],
+  lacto_ovo: [],
+  ovo: ['milk'],
+  pesco: [],
+  gluten_free: ['gluten'],
 };
 
 // 프리셋 "첨가물 많아?" 확인 대상
@@ -124,8 +154,7 @@ export function evaluateProfile(data: ExtractResult, profile: Profile): Evaluati
   for (const id of profile.restrictions) {
     const kw = RESTRICTION_KEYWORDS[id];
     if (!kw) continue;
-    const llmBlock =
-      id === 'vegan' ? flags.non_vegan : id === 'gluten_free' ? flags.gluten : flags.milk;
+    const llmBlock = (RESTRICTION_FLAG[id] ?? []).flatMap((k) => flags[k]);
     const llmWarn = id === 'vegan' ? flags.vegan_ambiguous : [];
     combine(ingredients, kw.block, llmBlock).forEach((h) =>
       blockHits.push({ item: labelOf(id), reason: h })

@@ -16,14 +16,26 @@ export const ALLERGY_OPTIONS = [
   { id: 'milk', label: '우유/유제품' },
   { id: 'egg', label: '계란' },
   { id: 'tree_nuts', label: '견과류' },
+  { id: 'peanut', label: '땅콩' },
   { id: 'wheat', label: '밀/글루텐' },
+  { id: 'buckwheat', label: '메밀' },
   { id: 'soy', label: '대두' },
   { id: 'shellfish', label: '갑각류/해산물' },
+  { id: 'mackerel', label: '고등어' },
+  { id: 'pork', label: '돼지고기' },
+  { id: 'beef', label: '쇠고기' },
+  { id: 'chicken', label: '닭고기' },
+  { id: 'peach', label: '복숭아' },
+  { id: 'tomato', label: '토마토' },
+  { id: 'sulfites', label: '아황산류' },
 ] as const;
 
 export const RESTRICTION_OPTIONS = [
   { id: 'vegan', label: '비건' },
-  { id: 'lactose_free', label: '락토프리' },
+  { id: 'lacto', label: '락토' },
+  { id: 'lacto_ovo', label: '락토오보' },
+  { id: 'ovo', label: '오보' },
+  { id: 'pesco', label: '페스코' },
   { id: 'gluten_free', label: '글루텐 제한' },
 ] as const;
 

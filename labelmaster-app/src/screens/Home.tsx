@@ -59,7 +59,7 @@ export default function Home() {
 
   return (
     <Screen>
-      <div style={{ flex: 1, overflow: 'auto', padding: '62px 22px 24px' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '24px 22px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <div
             style={{
