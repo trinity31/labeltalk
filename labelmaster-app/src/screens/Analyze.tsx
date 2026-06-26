@@ -102,9 +102,12 @@ export default function Analyze() {
       if (data == null || q.length === 0 || asking) return;
       try {
         setAsking(true);
-        // 자유 질문(LLM)에도 보상형 광고를 함께 노출해요.
-        const ev = await runWithRewardedAd(() =>
-          askCustomQuestion(data.ingredients, q, data.name, profile?.sensitivityLevel ?? 'normal')
+        // 질문 분석에는 광고를 띄우지 않아요. (비용이 큰 원재료 분석에만 광고를 노출)
+        const ev = await askCustomQuestion(
+          data.ingredients,
+          q,
+          data.name,
+          profile?.sensitivityLevel ?? 'normal'
         );
         await addRecentQuestion(q); // 최근 질문에 저장
         track('custom_question', { verdict: ev.verdict });
