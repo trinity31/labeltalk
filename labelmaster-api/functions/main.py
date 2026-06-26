@@ -182,7 +182,11 @@ def analyzeImage(req: https_fn.Request) -> https_fn.Response:
         1) Transcribe the ingredient list (원재료명) from the label into `ingredients`, copying each ingredient name VERBATIM — character-for-character, in the original Korean exactly as printed.
            - Do NOT replace a specific ingredient with its functional category. e.g. keep "유채레시틴" as "유채레시틴" (do NOT write "유화제"); keep "비타민D3" as "비타민D3" (do NOT write "비타민D"); keep "제삼인산칼슘" as "제삼인산칼슘".
            - Do NOT translate, summarize, normalize, paraphrase, abbreviate, or "correct" the names. Read the small print carefully and copy it exactly.
-        2) Then, using your own food knowledge, classify the risk of each ingredient into the flags_* arrays below.
+        2) CRITICAL — Allergen declaration ("함유" 표시): Korean labels print a legally-required allergen statement SEPARATELY from the 원재료명, often in a bold box, e.g. "복숭아, 우유, 대두 함유", "알레르기 유발물질: 우유, 대두 함유", "○○ 함유", or cross-contamination notes like "○○를 사용한 제품과 같은 제조시설에서 제조". You MUST read this statement — it is NOT part of the 원재료명 list, so do not skip it.
+           - For EACH allergen named in it, add an entry to `ingredients` written exactly as "○○(함유)" (e.g. "우유(함유)", "대두(함유)", "복숭아(함유)"), AND
+           - put that allergen into the matching flags_* array: 우유→flags_milk, 대두→flags_soy, 계란/난류→flags_egg, 밀→flags_gluten, 땅콩·견과류(호두·잣·아몬드 등)→flags_nuts, 새우·게·조개·갑각류→flags_shellfish.
+           - Do this EVEN IF the underlying ingredient is not obviously named in the 원재료명 (e.g. a "식물성크림혼합분말"/creamer or culture medium may contain milk without the word "우유" ever appearing in the list). Missing a declared allergen is a serious safety error.
+        3) Then, using your own food knowledge, classify the risk of each ingredient into the flags_* arrays below.
            IMPORTANT: include ingredients even if their names are uncommon or not obviously named — judge by what the ingredient actually is, not just by keyword.
            - flags_non_vegan: ONLY ingredients that are DEFINITELY animal-derived (milk, egg, gelatin, honey, meat/fish, carmine, shellac, etc.).
              Do NOT put minerals/salts here (e.g. 제삼인산칼슘/calcium phosphate, 탄산칼슘, 식염/salt), nor plant proteins (완두단백/pea protein), nor plant-derived lecithin (유채레시틴), nor plain plant ingredients. These are vegan-OK — leave them out.
@@ -196,10 +200,13 @@ def analyzeImage(req: https_fn.Request) -> https_fn.Response:
            - flags_shellfish: crustacean/shellfish/seafood ingredients
            - flags_additives: food additives (flavors, sweeteners, preservatives, colors, emulsifiers, thickeners, etc.)
            Each flags_* array should contain the ingredient names (as written in `ingredients`). Use an empty array if none apply.
-        3) `answer` is one of "yes"/"no"/"unknown" for the question, `name` is the product name, `reason` is a short explanation. Answer in the same language as the question.
+        4) `answer` is one of "yes"/"no"/"unknown" for the question, `name` is the product name, `reason` is a short explanation. Answer in the same language as the question.
 
         Answer example:
             {{"answer": "no", "name": "Vermont Curry", "ingredients": ["밀가루", "전지분유", "유청분말", "합성향료", "탄산칼슘"], "reason": "우유 성분이 있어요.", "flags_non_vegan": ["전지분유", "유청분말"], "flags_vegan_ambiguous": ["합성향료"], "flags_gluten": ["밀가루"], "flags_milk": ["전지분유", "유청분말"], "flags_egg": [], "flags_nuts": [], "flags_soy": [], "flags_shellfish": [], "flags_additives": ["합성향료"]}}
+
+        Allergen-declaration example — label lists 식물성크림혼합분말 (no "우유" in the list) but a separate box says "복숭아, 우유, 대두 함유":
+            {{"answer": "no", "name": "데일리 콤부차 피치", "ingredients": ["콤부차분말", "복숭아과즙분말", "식물성크림혼합분말", "우유(함유)", "대두(함유)", "복숭아(함유)"], "reason": "우유·대두·복숭아 알레르기 표시가 있어요.", "flags_non_vegan": [], "flags_vegan_ambiguous": ["식물성크림혼합분말"], "flags_gluten": [], "flags_milk": ["우유(함유)"], "flags_egg": [], "flags_nuts": [], "flags_soy": ["대두(함유)"], "flags_shellfish": [], "flags_additives": []}}
 
         Question:
         Is this product vegan?
