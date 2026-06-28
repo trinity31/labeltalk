@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { colors, verdictStyle, Verdict, DISCLAIMER } from '../lib/theme';
 import { track } from '../lib/analytics';
+import { TOSS_DEEP_LINK, OG_IMAGE_URL } from '../config/share';
 import { Screen } from '../components/ui';
 
 interface ResultState {
@@ -40,6 +41,18 @@ export default function Result() {
     ]
       .filter(Boolean)
       .join('\n');
+
+    // 1순위: 토스 공유 링크(+OG 미리보기). 외부로 공유되면 OG 이미지가 노출돼요.
+    try {
+      const { getTossShareLink, share } = await import('@apps-in-toss/web-framework');
+      const tossLink = await getTossShareLink(TOSS_DEEP_LINK, OG_IMAGE_URL || undefined);
+      await share({ message: `${message}\n${tossLink}` });
+      return;
+    } catch {
+      /* 토스 환경이 아니거나 실패 → 웹 공유로 폴백 */
+    }
+
+    // 폴백: 일반 웹 공유/복사 (데스크톱 브라우저 등)
     try {
       if (navigator.share) {
         await navigator.share({ text: message });
