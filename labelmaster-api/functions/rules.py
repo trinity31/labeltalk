@@ -96,6 +96,23 @@ def _low_quality(ingredients):
     return len([i for i in ingredients if i.strip()]) < 2
 
 
+def _short_reason(s):
+    """근거 표시용 — 너무 긴 성분 덩어리는 첫 괄호 앞 이름까지만 보여줘 가독성을 높여요.
+    예: '17종혼합유산균알파-10[유산균혼합분말{...}]' → '17종혼합유산균알파-10'
+    (짧은 항목과 '우유(함유)' 같은 표기는 그대로 유지)
+    """
+    s = s.strip()
+    if len(s) <= 20:
+        return s
+    for i, ch in enumerate(s):
+        if ch in "[{（(":
+            head = s[:i].strip()
+            if head:
+                return head
+            break
+    return s
+
+
 def _dedup(xs):
     out = []
     for x in xs:
@@ -165,11 +182,11 @@ def evaluate_profile(data, profile):
 
     if block_hits:
         item = block_hits[0][0]
-        return {"verdict": "danger", "basisLabel": f"내 프로필 기준 · {item}", "title": "피하는 게\n좋겠어요", "reasons": _dedup([r for (_, r) in block_hits])[:3]}
+        return {"verdict": "danger", "basisLabel": f"내 프로필 기준 · {item}", "title": "피하는 게\n좋겠어요", "reasons": _dedup([_short_reason(r) for (_, r) in block_hits])[:3]}
 
     # 가볍게: 애매한(출처불명·첨가물) 성분은 넘어가고 명확한 위험만
     if level != "light" and warn_hits:
         item = warn_hits[0][0]
-        return {"verdict": "warning", "basisLabel": f"내 프로필 기준 · {item}", "title": "확인이\n필요해요", "reasons": _dedup([r for (_, r) in warn_hits])[:3]}
+        return {"verdict": "warning", "basisLabel": f"내 프로필 기준 · {item}", "title": "확인이\n필요해요", "reasons": _dedup([_short_reason(r) for (_, r) in warn_hits])[:3]}
 
     return {"verdict": "ok", "basisLabel": "내 프로필 기준", "title": "문제 성분이\n안 보여요", "reasons": []}
