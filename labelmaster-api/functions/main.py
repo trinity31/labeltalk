@@ -11,11 +11,14 @@ import google.cloud.firestore
 
 import google.generativeai as genai
 import os
+import json
 import typing
 from io import BytesIO
 from PIL import Image
 import base64
 import PIL
+
+from rules import evaluate_profile
 
 from dotenv import load_dotenv
 from imghdr import what
@@ -126,10 +129,12 @@ def analyzeImage(req: https_fn.Request) -> https_fn.Response:
         # 입력은 두 가지 방식을 지원해요.
         # 1) JSON 본문: { "image_base64": "...", "question": "..." } (토스 미니앱 RN 연동용)
         # 2) multipart/form-data: file + question (기존 방식)
+        profile = None  # 프로필 기준 판정용 (없으면 추출만 반환)
         if req.is_json:
             payload = req.get_json(silent=True) or {}
             question = payload.get("question", "")
             image_b64 = payload.get("image_base64")
+            profile = payload.get("profile")
 
             if not image_b64:
                 return https_fn.Response("No image_base64 provided", status=400)
@@ -230,8 +235,18 @@ def analyzeImage(req: https_fn.Request) -> https_fn.Response:
         for attempt in range(3):
             try:
                 response = model.generate_content(contents=[image_part, prompt])
+                result_text = response.text
+                # 프로필이 오면 추출 결과에 프로필 기준 판정(verdict)을 더해 함께 반환해요.
+                # (structured output이라 항상 유효한 JSON. 만약 파싱 실패하면 추출만 반환)
+                if profile:
+                    try:
+                        parsed = json.loads(result_text)
+                        parsed["verdict"] = evaluate_profile(parsed, profile)
+                        result_text = json.dumps(parsed, ensure_ascii=False)
+                    except Exception as ex:
+                        print(f"verdict 계산 건너뜀: {ex}")
                 return https_fn.Response(
-                    response.text, status=200, mimetype="application/json"
+                    result_text, status=200, mimetype="application/json"
                 )
             except Exception as e:
                 last_err = e

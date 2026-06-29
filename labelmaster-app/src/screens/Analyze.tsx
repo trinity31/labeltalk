@@ -9,7 +9,6 @@ import {
   askCustomQuestion,
   extractIngredients,
 } from '../lib/api';
-import { evaluateProfile } from '../lib/rules';
 import { runWithRewardedAd } from '../lib/ads';
 import { track } from '../lib/analytics';
 import { Screen, Spinner } from '../components/ui';
@@ -39,7 +38,8 @@ export default function Analyze() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      setProfile(await loadProfile());
+      const loadedProfile = await loadProfile();
+      setProfile(loadedProfile);
       setRecentQuestions(await loadRecentQuestions());
 
       const key = sample ? 'sample' : imageBase64 ?? '';
@@ -66,7 +66,10 @@ export default function Analyze() {
           return;
         }
         // 실제 사진 분석(LLM)에는 보상형 광고를 함께 노출해요. (샘플·캐시 히트는 제외)
-        const result = await runWithRewardedAd(() => extractIngredients(imageBase64));
+        // 프로필을 함께 보내면 백엔드가 추출 + 프로필 기준 판정(verdict)까지 돌려줘요.
+        const result = await runWithRewardedAd(() =>
+          extractIngredients(imageBase64, loadedProfile ?? undefined)
+        );
         extractionCache = { key, data: result };
         track('analyze_done', { ingredient_count: result.ingredients.length });
         if (alive) {
@@ -87,13 +90,17 @@ export default function Analyze() {
     };
   }, [imageBase64, sample]);
 
-  // 내 프로필 기준 확인 (룰 기반)
+  // 내 프로필 기준 확인 — 백엔드가 계산해 준 판정(verdict)을 그대로 사용해요.
   const checkProfile = useCallback(() => {
-    if (data == null || profile == null) return;
-    const ev = evaluateProfile(data, profile);
+    if (data == null) return;
+    const ev = data.verdict;
+    if (ev == null) {
+      alert('분석을 다시 시도해 주세요.');
+      return;
+    }
     track('profile_check', { verdict: ev.verdict });
     navigate('/result', { state: { ...ev, productName: data.name } });
-  }, [data, profile, navigate]);
+  }, [data, navigate]);
 
   // 자유 질문 (LLM) — 입력창 제출 또는 최근 질문 버튼에서 호출
   const ask = useCallback(

@@ -1,3 +1,5 @@
+import { Profile } from './profile';
+
 // Firebase Functions(Gemini 2.5 Flash, structured output) 백엔드 연동.
 // 지역/프로젝트가 바뀌면 이 URL만 교체하면 됩니다.
 export const ANALYZE_URL =
@@ -18,12 +20,22 @@ export interface RiskFlags {
   additives: string[];
 }
 
+// 프로필 기준 판정 — 백엔드(rules.py)가 계산해 응답에 함께 담아줘요.
+// (키워드/판정 튜닝을 앱 재출시 없이 함수 배포만으로 반영하기 위해 서버에서 처리)
+export interface ProfileVerdict {
+  verdict: 'ok' | 'warning' | 'danger';
+  basisLabel: string;
+  title: string;
+  reasons: string[];
+}
+
 export interface ExtractResult {
   name: string;
   ingredients: string[];
   flags: RiskFlags;
   rawAnswer: string; // 'yes' | 'no' | 'unknown'
   reason: string;
+  verdict?: ProfileVerdict; // 프로필을 보냈을 때만 채워져요
 }
 
 // 분석 실패 — rateLimited면 사용량 초과(429)예요.
@@ -52,13 +64,17 @@ function emptyFlags(): RiskFlags {
 
 // 원재료 추출 요청 — Gemini가 라벨 텍스트를 읽어 원재료 배열을 돌려줘요.
 // 판단(✅/❌/⚠️)은 안전을 위해 클라이언트의 rules.ts에서 보수적으로 처리해요.
-export async function extractIngredients(imageBase64: string): Promise<ExtractResult> {
+export async function extractIngredients(
+  imageBase64: string,
+  profile?: Profile
+): Promise<ExtractResult> {
   const res = await fetch(ANALYZE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       image_base64: imageBase64,
       question: '이 제품의 원재료를 모두 읽어서 알려주세요.',
+      profile, // 보내면 백엔드가 프로필 기준 판정(verdict)까지 계산해 줘요
     }),
   });
 
@@ -85,6 +101,20 @@ export async function extractIngredients(imageBase64: string): Promise<ExtractRe
     },
     rawAnswer: typeof data.answer === 'string' ? data.answer : 'unknown',
     reason: typeof data.reason === 'string' ? data.reason : '',
+    verdict: parseVerdict(data.verdict),
+  };
+}
+
+// 백엔드가 응답에 담아준 프로필 판정을 안전하게 파싱해요. (없거나 형식이 다르면 undefined)
+function parseVerdict(v: unknown): ProfileVerdict | undefined {
+  if (v == null || typeof v !== 'object') return undefined;
+  const o = v as Record<string, unknown>;
+  if (o.verdict !== 'ok' && o.verdict !== 'warning' && o.verdict !== 'danger') return undefined;
+  return {
+    verdict: o.verdict,
+    basisLabel: typeof o.basisLabel === 'string' ? o.basisLabel : '내 프로필 기준',
+    title: typeof o.title === 'string' ? o.title : '',
+    reasons: normalizeIngredients(o.reasons),
   };
 }
 
