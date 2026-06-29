@@ -18,7 +18,8 @@ const ALLERGY_FLAG: Record<string, keyof RiskFlags> = {
 };
 
 // PRD 8.2 — 보수적 판단을 위한 키워드 테이블.
-const MILK = ['우유', '유제품', '분유', '전지분유', '탈지분유', '유청', '버터', '치즈', '크림', '카제인', '카세인', '락토'];
+// '락토'는 프락토올리고당·갈락토올리고당에 오매칭되므로 빼고, 실제 우유 성분(유당/락토페린)으로 대체.
+const MILK = ['우유', '유제품', '분유', '전지분유', '탈지분유', '유청', '버터', '치즈', '크림', '카제인', '카세인', '유당', '락토페린'];
 const EGG = ['계란', '달걀', '난백', '난황', '전란', '난류'];
 const NUTS = ['견과', '아몬드', '호두', '캐슈', '피스타치오', '마카다미아', '헤이즐넛', '잣'];
 const PEANUT = ['땅콩', '낙화생'];
@@ -60,7 +61,9 @@ const ALLERGY_KEYWORDS: Record<string, string[]> = {
 // 비건 위반 — 명확한 동물성(❌급)
 const VEGAN_BLOCK = [...MILK, ...EGG, ...MEAT, ...SEAFOOD];
 // 비건 — 출처 불명(⚠️급)
-const VEGAN_WARN = ['향료', '천연향료', '유화제'];
+// 일반 향료(향료/천연향료)는 시판 가공식품에서 거의 식물성·합성이라 과판정만 유발해 제외했어요.
+// 동물성이 이름에 명시된 향료(우유향·버터향 등)는 MILK/MEAT 키워드와 백엔드 vegan_ambiguous로 잡혀요.
+const VEGAN_WARN = ['유화제'];
 
 // 식이제한 id → { block, warn }
 const RESTRICTION_KEYWORDS: Record<string, { block: string[]; warn: string[] }> = {
@@ -97,10 +100,16 @@ const labelOf = (id: string): string => {
   return id;
 };
 
+// 동물성 카테고리(우유·계란·육류·해산물·비건) 매칭에서, '식물성'으로 명시된 성분
+// (식물성크림혼합분말·식물성유지 등)은 동물성으로 오인하지 않도록 제외해요.
+const PLANT_MARK = '식물성';
+
 // ingredients 배열에서 keyword를 포함하는 항목을 찾아 반환 (근거 표시용 원재료명)
-function matchIngredients(ingredients: string[], keywords: string[]): string[] {
+// excludePlant=true면 '식물성' 표기 성분은 건너뛰어요 (동물성 카테고리 전용).
+function matchIngredients(ingredients: string[], keywords: string[], excludePlant = false): string[] {
   const found: string[] = [];
   for (const ing of ingredients) {
+    if (excludePlant && ing.includes(PLANT_MARK)) continue;
     if (keywords.some((kw) => ing.includes(kw)) && !found.includes(ing)) {
       found.push(ing);
     }
@@ -109,9 +118,18 @@ function matchIngredients(ingredients: string[], keywords: string[]): string[] {
 }
 
 // 키워드 매칭(결정적·안전) ∪ LLM 플래그(표에 없는 성분 보완)
-function combine(ingredients: string[], keywords: string[], llmFlags: string[] = []): string[] {
-  return [...new Set([...matchIngredients(ingredients, keywords), ...llmFlags])];
+function combine(
+  ingredients: string[],
+  keywords: string[],
+  llmFlags: string[] = [],
+  excludePlant = false
+): string[] {
+  return [...new Set([...matchIngredients(ingredients, keywords, excludePlant), ...llmFlags])];
 }
+
+// 동물성 출처 카테고리 — '식물성' 제외 규칙을 적용할 대상
+const ANIMAL_ALLERGY = new Set(['milk', 'egg', 'shellfish', 'mackerel', 'pork', 'beef', 'chicken']);
+const ANIMAL_RESTRICTION = new Set(['vegan', 'lacto', 'lacto_ovo', 'ovo', 'pesco']);
 
 export interface Evaluation {
   verdict: Verdict;
@@ -147,16 +165,22 @@ export function evaluateProfile(data: ExtractResult, profile: Profile): Evaluati
 
   // 알레르기 (전부 ❌급) — 키워드 ∪ LLM 플래그
   for (const id of profile.allergies) {
-    const hits = combine(ingredients, ALLERGY_KEYWORDS[id] ?? [], flags[ALLERGY_FLAG[id]!]);
+    const hits = combine(
+      ingredients,
+      ALLERGY_KEYWORDS[id] ?? [],
+      flags[ALLERGY_FLAG[id]!],
+      ANIMAL_ALLERGY.has(id)
+    );
     hits.forEach((h) => blockHits.push({ item: labelOf(id), reason: h }));
   }
   // 식이제한
   for (const id of profile.restrictions) {
     const kw = RESTRICTION_KEYWORDS[id];
     if (!kw) continue;
+    const animal = ANIMAL_RESTRICTION.has(id);
     const llmBlock = (RESTRICTION_FLAG[id] ?? []).flatMap((k) => flags[k]);
     const llmWarn = id === 'vegan' ? flags.vegan_ambiguous : [];
-    combine(ingredients, kw.block, llmBlock).forEach((h) =>
+    combine(ingredients, kw.block, llmBlock, animal).forEach((h) =>
       blockHits.push({ item: labelOf(id), reason: h })
     );
     combine(ingredients, kw.warn, llmWarn).forEach((h) =>
@@ -226,7 +250,7 @@ export function evaluatePreset(data: ExtractResult, key: PresetKey): Evaluation 
 
   switch (key) {
     case 'vegan': {
-      const block = combine(ingredients, VEGAN_BLOCK, flags.non_vegan);
+      const block = combine(ingredients, VEGAN_BLOCK, flags.non_vegan, true);
       const warn = combine(ingredients, VEGAN_WARN, flags.vegan_ambiguous);
       if (block.length > 0) {
         return {
@@ -272,7 +296,7 @@ export function evaluatePreset(data: ExtractResult, key: PresetKey): Evaluation 
       return { verdict: 'ok', basisLabel: '첨가물 많아?', title: '눈에 띄는 첨가물이\n안 보여요', reasons: [] };
     }
     case 'milk': {
-      const hits = combine(ingredients, MILK, flags.milk);
+      const hits = combine(ingredients, MILK, flags.milk, true);
       if (hits.length > 0) {
         return {
           verdict: 'danger',
