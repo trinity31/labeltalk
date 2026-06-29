@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { colors } from '../lib/theme';
 import { Profile, loadProfile, profileSummary } from '../lib/profile';
 import { track } from '../lib/analytics';
-import { PrimaryButton, Screen, Spinner } from '../components/ui';
+import { Screen, Spinner } from '../components/ui';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -152,14 +152,6 @@ export default function Home() {
           <div style={{ fontSize: 12, color: colors.grey300, marginTop: 7 }}>
             🎬 분석 시 짧은 광고가 표시돼요
           </div>
-        </div>
-
-        <div style={{ marginTop: 14 }}>
-          <PrimaryButton
-            title={picking ? '불러오는 중…' : '광고 보고 분석하기'}
-            onPress={handlePick}
-            disabled={picking}
-          />
         </div>
 
         <div
