@@ -167,8 +167,10 @@ def analyzeImage(req: https_fn.Request) -> https_fn.Response:
             with Image.open(temp_image_path) as im:
                 if im.mode != "RGB":
                     im = im.convert("RGB")
-                # 메모리/지연/비용 절감 — OCR엔 1024px면 충분해요.
-                im.thumbnail((1024, 1024))
+                # 원재료표는 깨알 같은 작은 글씨라 해상도가 OCR 정확도를 좌우해요.
+                # 1024px에선 글자가 뭉개져 오독/누락이 생겨 2048px로 올렸어요.
+                # (Gemini 2.5는 큰 이미지를 타일로 처리. 메모리 512MB 내에서 안전)
+                im.thumbnail((2048, 2048))
                 buf = BytesIO()
                 im.save(buf, format="JPEG", quality=90)
                 image_part = {"mime_type": "image/jpeg", "data": buf.getvalue()}
@@ -190,8 +192,10 @@ def analyzeImage(req: https_fn.Request) -> https_fn.Response:
            IMPORTANT: include ingredients even if their names are uncommon or not obviously named — judge by what the ingredient actually is, not just by keyword.
            - flags_non_vegan: ONLY ingredients that are DEFINITELY animal-derived (milk, egg, gelatin, honey, meat/fish, carmine, shellac, etc.).
              Do NOT put minerals/salts here (e.g. 제삼인산칼슘/calcium phosphate, 탄산칼슘, 식염/salt), nor plant proteins (완두단백/pea protein), nor plant-derived lecithin (유채레시틴), nor plain plant ingredients. These are vegan-OK — leave them out.
-           - flags_vegan_ambiguous: ingredients whose source could genuinely be EITHER animal OR plant and need checking (e.g. 천연향료/natural flavor, 비타민D3, mono-/di-glycerides, enzymes). Put uncertain-source items here, NOT in flags_non_vegan.
-             IMPORTANT: Do NOT flag common staples that are practically vegan — 설탕/sugar, 소금/salt, 밀가루/flour, 전분/starch, 식물성 기름/plant oils, 식초/vinegar, 고추장, 된장, 간장, 고춧가루, 쌀/현미 등은 비건으로 간주하고 비우세요. Judge ingredients as commonly produced; do NOT flag something merely because of rare processing methods (e.g. bone-char-refined sugar) or theoretical trace contamination. Only flag when the ingredient itself has a real uncertain animal-vs-plant origin.
+           - flags_vegan_ambiguous: ingredients whose source could genuinely be EITHER animal OR plant and need checking (e.g. 비타민D3, mono-/di-glycerides(모노·디글리세리드), enzymes(효소)). Put uncertain-source items here, NOT in flags_non_vegan.
+             IMPORTANT: Do NOT flag common staples that are practically vegan — 설탕/sugar, 소금/salt, 밀가루/flour, 전분/starch, 식물성 기름/plant oils, 식초/vinegar, 고추장, 된장, 간장, 고춧가루, 쌀/현미 등은 비건으로 간주하고 비우세요.
+             ALSO treat generic flavorings as practically vegan: 향료·합성향료·천연향료·착향료·"향료 N종" 같은 일반 향료는 비건으로 간주하고 flag하지 마세요(시판 가공식품의 향료는 거의 식물성/합성이에요). 오직 우유향·버터향·치즈향처럼 동물성 출처가 이름에 명시된 향료만 flag하세요.
+             Judge ingredients as commonly produced; do NOT flag something merely because of rare processing methods (e.g. bone-char-refined sugar) or theoretical trace contamination. Only flag when the ingredient itself has a real uncertain animal-vs-plant origin.
            - flags_gluten: wheat/barley/rye/malt or other gluten-containing/likely ingredients
            - flags_milk: milk or dairy-derived ingredients
            - flags_egg: egg-derived ingredients
