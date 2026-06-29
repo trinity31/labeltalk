@@ -189,10 +189,13 @@ def analyzeImage(req: https_fn.Request) -> https_fn.Response:
         1) Transcribe the ingredient list (원재료명) from the label into `ingredients`, copying each ingredient name VERBATIM — character-for-character, in the original Korean exactly as printed.
            - Do NOT replace a specific ingredient with its functional category. e.g. keep "유채레시틴" as "유채레시틴" (do NOT write "유화제"); keep "비타민D3" as "비타민D3" (do NOT write "비타민D"); keep "제삼인산칼슘" as "제삼인산칼슘".
            - Do NOT translate, summarize, normalize, paraphrase, abbreviate, or "correct" the names. Read the small print carefully and copy it exactly.
-        2) CRITICAL — Allergen declaration ("함유" 표시): Korean labels print a legally-required allergen statement SEPARATELY from the 원재료명, often in a bold box, e.g. "복숭아, 우유, 대두 함유", "알레르기 유발물질: 우유, 대두 함유", "○○ 함유", or cross-contamination notes like "○○를 사용한 제품과 같은 제조시설에서 제조". You MUST read this statement — it is NOT part of the 원재료명 list, so do not skip it.
-           - For EACH allergen named in it, add an entry to `ingredients` written exactly as "○○(함유)" (e.g. "우유(함유)", "대두(함유)", "복숭아(함유)"), AND
-           - put that allergen into the matching flags_* array: 우유→flags_milk, 대두→flags_soy, 계란/난류→flags_egg, 밀→flags_gluten, 땅콩·견과류(호두·잣·아몬드 등)→flags_nuts, 새우·게·조개·갑각류→flags_shellfish.
-           - Do this EVEN IF the underlying ingredient is not obviously named in the 원재료명 (e.g. a "식물성크림혼합분말"/creamer or culture medium may contain milk without the word "우유" ever appearing in the list). Missing a declared allergen is a serious safety error.
+        2) CRITICAL — Allergen statements. Korean labels print allergen info SEPARATELY from the 원재료명. There are TWO DIFFERENT kinds and you MUST handle them differently:
+           (a) CONTAINS — "함유": e.g. "대두, 밀 함유", "알레르기 유발물질: 우유 함유", "○○ 함유". These allergens ARE in the product.
+               → For EACH, add "○○(함유)" to `ingredients` (e.g. "우유(함유)", "대두(함유)"), AND put it in the matching flags_* array: 우유→flags_milk, 대두→flags_soy, 계란/난류→flags_egg, 밀→flags_gluten, 땅콩·견과류(호두·잣·아몬드 등)→flags_nuts, 새우·게·조개·갑각류→flags_shellfish.
+               → Do this EVEN IF not obviously named in the 원재료명 (a creamer/culture medium may contain milk without "우유" appearing).
+           (b) CROSS-CONTAMINATION — 같은 시설/혼입 가능 (NOT in the product): e.g. "○○를 사용한 제품과 같은 제조시설에서 제조", "○○ 혼입 가능", "○○를 사용한 시설에서 생산". These allergens are NOT ingredients of this product.
+               → Add EACH as "○○(교차오염)" to `ingredients`, and DO NOT put them into ANY flags_* array.
+           매우 중요: "같은 제조시설"·"혼입 가능"은 절대 "함유"로 취급하지 마세요(완전히 다른 의미예요). 두 문장이 모두 있으면 각각 "(함유)"와 "(교차오염)"으로 구분해 정확히 표기하세요. 함유가 아닌 성분을 함유로 잘못 표기하는 건 심각한 오류예요.
         3) Then, using your own food knowledge, classify the risk of each ingredient into the flags_* arrays below.
            IMPORTANT: include ingredients even if their names are uncommon or not obviously named — judge by what the ingredient actually is, not just by keyword.
            - flags_non_vegan: ONLY ingredients that are DEFINITELY animal-derived (milk, egg, gelatin, honey, meat/fish, carmine, shellac, etc.).

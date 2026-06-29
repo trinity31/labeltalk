@@ -55,6 +55,9 @@ RESTRICTION_FLAG = {"vegan": ["non_vegan"], "lacto": ["egg"], "lacto_ovo": [], "
 ANIMAL_ALLERGY = {"milk", "egg", "shellfish", "mackerel", "pork", "beef", "chicken"}
 ANIMAL_RESTRICTION = {"vegan", "lacto", "lacto_ovo", "ovo", "pesco"}
 PLANT_MARK = "식물성"
+# 교차오염(같은 제조시설/혼입 가능) 표기 — 제품에 든 게 아니므로 기본은 무시,
+# 프로필 '교차오염 주의'(checkCrossContamination)가 켜졌을 때만 ⚠️로 안내해요.
+CROSS_MARK = "교차오염"
 
 ALLERGY_LABEL = {
     "milk": "우유/유제품", "egg": "계란", "tree_nuts": "견과류", "peanut": "땅콩", "wheat": "밀/글루텐",
@@ -82,12 +85,24 @@ def _head(s):
 
 def _match_ingredients(ingredients, keywords, exclude_plant=False):
     """원재료 배열에서 keyword를 포함하는 항목을 반환.
-    exclude_plant면 '식물성'이 섞인 항목은 통째로 건너뛰어요(예: '크림'이 식물성크림에 오매칭되는 것 방지)."""
+    exclude_plant면 '식물성'이 섞인 항목은 통째로 건너뛰어요(예: '크림'이 식물성크림에 오매칭되는 것 방지).
+    교차오염(같은 시설) 표기 항목은 제품에 든 게 아니므로 항상 제외해요."""
     found = []
     for ing in ingredients:
+        if CROSS_MARK in ing:
+            continue
         if exclude_plant and PLANT_MARK in ing:
             continue
         if any(kw in ing for kw in keywords) and ing not in found:
+            found.append(ing)
+    return found
+
+
+def _match_cross(ingredients, keywords):
+    """교차오염(같은 시설) 표기 항목 중 keyword 매칭 — '교차오염 주의'가 켜졌을 때만 사용해요."""
+    found = []
+    for ing in ingredients:
+        if CROSS_MARK in ing and any(kw in ing for kw in keywords) and ing not in found:
             found.append(ing)
     return found
 
@@ -161,13 +176,18 @@ def evaluate_profile(data, profile):
 
     block_hits = []  # (item, reason)
     warn_hits = []
+    check_cross = bool(profile.get("checkCrossContamination"))
 
-    # 알레르기 (전부 ❌급) — 키워드 ∪ LLM 플래그
+    # 알레르기 (포함은 ❌급) — 키워드 ∪ LLM 플래그
     for rid in profile.get("allergies", []):
         kws = ALLERGY_KEYWORDS.get(rid, [])
         llm = flags.get(ALLERGY_FLAG.get(rid, ""), [])
         for h in _combine(ingredients, kws, llm, rid in ANIMAL_ALLERGY):
             block_hits.append((_label_of(rid), h))
+        # 교차오염은 제품에 든 게 아니므로 기본 무시, '교차오염 주의' 켜진 경우만 ⚠️
+        if check_cross:
+            for h in _match_cross(ingredients, kws):
+                warn_hits.append((f"{_label_of(rid)}·교차오염", h))
 
     # 식이제한
     for rid in profile.get("restrictions", []):
