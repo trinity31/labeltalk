@@ -207,7 +207,7 @@ def analyzeImage(req: https_fn.Request) -> https_fn.Response:
         4) `answer` is one of "yes"/"no"/"unknown" for the question, `name` is the product name, `reason` is a short explanation. Answer in the same language as the question.
 
         Answer example:
-            {{"answer": "no", "name": "Vermont Curry", "ingredients": ["밀가루", "전지분유", "유청분말", "합성향료", "탄산칼슘"], "reason": "우유 성분이 있어요.", "flags_non_vegan": ["전지분유", "유청분말"], "flags_vegan_ambiguous": ["합성향료"], "flags_gluten": ["밀가루"], "flags_milk": ["전지분유", "유청분말"], "flags_egg": [], "flags_nuts": [], "flags_soy": [], "flags_shellfish": [], "flags_additives": ["합성향료"]}}
+            {{"answer": "no", "name": "Vermont Curry", "ingredients": ["밀가루", "전지분유", "유청분말", "합성향료", "탄산칼슘"], "reason": "우유 성분이 있어요.", "flags_non_vegan": ["전지분유", "유청분말"], "flags_vegan_ambiguous": [], "flags_gluten": ["밀가루"], "flags_milk": ["전지분유", "유청분말"], "flags_egg": [], "flags_nuts": [], "flags_soy": [], "flags_shellfish": [], "flags_additives": ["합성향료"]}}
 
         Allergen-declaration example — label lists 식물성크림혼합분말 (no "우유" in the list) but a separate box says "복숭아, 우유, 대두 함유":
             {{"answer": "no", "name": "데일리 콤부차 피치", "ingredients": ["콤부차분말", "복숭아과즙분말", "식물성크림혼합분말", "우유(함유)", "대두(함유)", "복숭아(함유)"], "reason": "우유·대두·복숭아 알레르기 표시가 있어요.", "flags_non_vegan": [], "flags_vegan_ambiguous": ["식물성크림혼합분말"], "flags_gluten": [], "flags_milk": ["우유(함유)"], "flags_egg": [], "flags_nuts": [], "flags_soy": ["대두(함유)"], "flags_shellfish": [], "flags_additives": []}}
