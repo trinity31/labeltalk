@@ -200,10 +200,10 @@ def analyzeImage(req: https_fn.Request) -> https_fn.Response:
            IMPORTANT: include ingredients even if their names are uncommon or not obviously named — judge by what the ingredient actually is, not just by keyword.
            - flags_non_vegan: ONLY ingredients that are DEFINITELY animal-derived (milk, egg, gelatin, honey, meat/fish, carmine, shellac, etc.).
              Do NOT put minerals/salts here (e.g. 제삼인산칼슘/calcium phosphate, 탄산칼슘, 식염/salt), nor plant proteins (완두단백/pea protein), nor plant-derived lecithin (유채레시틴), nor plain plant ingredients. These are vegan-OK — leave them out.
-             Do NOT put flavorings here either — "○○향" 향미 성분(치킨향분말·소고기향·우유향 등), 향료, 착향료는 향미 첨가물로 거의 합성/식물성이라 동물성이 아니에요. 실제 동물성은 향이 아니라 직접 성분명(닭고기·우유·유청 등)으로 판단하세요.
+             Do NOT put flavorings/seasonings here either — 고기·동물 '맛/향/풍미'를 내는 조미 성분(치킨향분말·소고기맛베이스·비프풍미분말·사골맛분말·향료·착향료 등)은 거의 합성/식물성이라 동물성이 아니에요. 실제 동물성은 맛·향·풍미가 아니라 직접 성분명(닭고기·소고기분말·우유·유청 등 '맛/풍미' 단어 없이 그 자체)으로 판단하세요.
            - flags_vegan_ambiguous: ingredients whose source could genuinely be EITHER animal OR plant and need checking (e.g. 비타민D3, mono-/di-glycerides(모노·디글리세리드), enzymes(효소)). Put uncertain-source items here, NOT in flags_non_vegan.
              IMPORTANT: Do NOT flag common staples that are practically vegan — 설탕/sugar, 소금/salt, 밀가루/flour, 전분/starch, 식물성 기름/plant oils, 식초/vinegar, 고추장, 된장, 간장, 고춧가루, 쌀/현미 등은 비건으로 간주하고 비우세요.
-             ALSO treat ALL flavorings as practically vegan: 향료·합성향료·천연향료·착향료·"향료 N종"은 물론, "○○향"으로 된 향미 성분(치킨향분말·소고기향·우유향·버터향 등 동물성을 연상시키는 것 포함)도 시판품에선 거의 합성/식물성이라 flags_non_vegan·flags_vegan_ambiguous 어디에도 넣지 마세요. 실제 동물성은 향이 아니라 직접 성분명(우유·유청·닭고기 등)이나 "함유" 표시로만 판단해요(그건 키워드로 따로 잡혀요).
+             ALSO treat ALL flavorings/seasonings as practically vegan: 향료·합성향료·천연향료·착향료는 물론, 고기·동물 '맛/향/풍미'를 내는 조미 성분(치킨향분말·소고기맛베이스·비프풍미분말·사골맛분말 등 동물성을 연상시키는 것 포함)도 시판품에선 거의 합성/식물성이라 flags_non_vegan·flags_vegan_ambiguous 어디에도 넣지 마세요. 실제 동물성은 맛/향/풍미가 아니라 직접 성분명(우유·유청·소고기분말·닭고기 등)이나 "함유" 표시로만 판단해요(그건 키워드로 따로 잡혀요).
              Judge ingredients as commonly produced; do NOT flag something merely because of rare processing methods (e.g. bone-char-refined sugar) or theoretical trace contamination. Only flag when the ingredient itself has a real uncertain animal-vs-plant origin.
            - flags_gluten: wheat/barley/rye/malt or other gluten-containing/likely ingredients
            - flags_milk: milk or dairy-derived ingredients

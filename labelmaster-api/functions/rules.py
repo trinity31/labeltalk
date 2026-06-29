@@ -59,6 +59,16 @@ PLANT_MARK = "식물성"
 # 프로필 '교차오염 주의'(checkCrossContamination)가 켜졌을 때만 ⚠️로 안내해요.
 CROSS_MARK = "교차오염"
 
+# 고기/동물 맛·풍미를 내는 조미 성분(소고기맛베이스·비프풍미분말·치킨향분말 등)은
+# 실제 고기가 아니라 향미 첨가물이라 식이제한(비건 등) 판정에서 제외해요.
+# 단 '소고기분말'(실제 고기 분말)은 아래 마커가 없어 그대로 동물성으로 잡혀요.
+# (알레르기 판정에는 적용하지 않아 안전하게 보수적으로 둬요)
+FLAVOR_MARKERS = ["풍미", "맛베이스", "맛분말", "맛시즈닝", "시즈닝", "향"]
+
+
+def _is_flavoring(s):
+    return any(m in s for m in FLAVOR_MARKERS)
+
 ALLERGY_LABEL = {
     "milk": "우유/유제품", "egg": "계란", "tree_nuts": "견과류", "peanut": "땅콩", "wheat": "밀/글루텐",
     "buckwheat": "메밀", "soy": "대두", "shellfish": "갑각류/해산물", "mackerel": "고등어",
@@ -83,15 +93,18 @@ def _head(s):
     return s.strip()
 
 
-def _match_ingredients(ingredients, keywords, exclude_plant=False):
+def _match_ingredients(ingredients, keywords, exclude_plant=False, exclude_flavor=False):
     """원재료 배열에서 keyword를 포함하는 항목을 반환.
     exclude_plant면 '식물성'이 섞인 항목은 통째로 건너뛰어요(예: '크림'이 식물성크림에 오매칭되는 것 방지).
+    exclude_flavor면 고기 맛/풍미 조미 성분(소고기맛베이스 등)을 제외해요(식이제한 전용).
     교차오염(같은 시설) 표기 항목은 제품에 든 게 아니므로 항상 제외해요."""
     found = []
     for ing in ingredients:
         if CROSS_MARK in ing:
             continue
         if exclude_plant and PLANT_MARK in ing:
+            continue
+        if exclude_flavor and _is_flavoring(ing):
             continue
         if any(kw in ing for kw in keywords) and ing not in found:
             found.append(ing)
@@ -107,15 +120,18 @@ def _match_cross(ingredients, keywords):
     return found
 
 
-def _combine(ingredients, keywords, llm_flags=None, exclude_plant=False):
+def _combine(ingredients, keywords, llm_flags=None, exclude_plant=False, exclude_flavor=False):
     """키워드 매칭(결정적) ∪ LLM 플래그(표에 없는 성분 보완). 순서 유지 중복 제거."""
     flags = list(llm_flags or [])
     if exclude_plant:
         # LLM 플래그: 성분명 자체가 '식물성'인 항목(식물성크림·식물성유지)은 동물성에서 제외해요.
         # 단, 이름은 동물성 후보이고 식물성크림을 캐리어로만 포함하는 항목(유산균 블렌드)은 유지돼요.
         flags = [x for x in flags if PLANT_MARK not in _head(x)]
+    if exclude_flavor:
+        # LLM 플래그: 고기 맛/풍미 조미 성분(비프풍미분말·소고기맛베이스 등)은 식이제한에서 제외.
+        flags = [x for x in flags if not _is_flavoring(_head(x))]
     result = []
-    for x in _match_ingredients(ingredients, keywords, exclude_plant) + flags:
+    for x in _match_ingredients(ingredients, keywords, exclude_plant, exclude_flavor) + flags:
         if x not in result:
             result.append(x)
     return result
@@ -199,7 +215,8 @@ def evaluate_profile(data, profile):
         for k in RESTRICTION_FLAG.get(rid, []):
             llm_block += flags.get(k, [])
         llm_warn = flags.get("vegan_ambiguous", []) if rid == "vegan" else []
-        for h in _combine(ingredients, kw["block"], llm_block, animal):
+        # 식이제한(비건 등)은 고기 맛/풍미 조미 성분을 실제 고기로 보지 않아요(exclude_flavor).
+        for h in _combine(ingredients, kw["block"], llm_block, animal, exclude_flavor=animal):
             block_hits.append((_label_of(rid), h))
         for h in _combine(ingredients, kw["warn"], llm_warn):
             warn_hits.append((_label_of(rid), h))
