@@ -72,8 +72,17 @@ def _label_of(rid):
     return rid
 
 
+def _head(s):
+    """성분명(첫 괄호 앞)만 반환. 예: '식물성크림혼합분말(물엿, ...)' → '식물성크림혼합분말'"""
+    for i, ch in enumerate(s):
+        if ch in "[{（(":
+            return s[:i].strip()
+    return s.strip()
+
+
 def _match_ingredients(ingredients, keywords, exclude_plant=False):
-    """원재료 배열에서 keyword를 포함하는 항목을 반환. exclude_plant면 '식물성' 표기 성분은 건너뛰어요."""
+    """원재료 배열에서 keyword를 포함하는 항목을 반환.
+    exclude_plant면 '식물성'이 섞인 항목은 통째로 건너뛰어요(예: '크림'이 식물성크림에 오매칭되는 것 방지)."""
     found = []
     for ing in ingredients:
         if exclude_plant and PLANT_MARK in ing:
@@ -85,8 +94,13 @@ def _match_ingredients(ingredients, keywords, exclude_plant=False):
 
 def _combine(ingredients, keywords, llm_flags=None, exclude_plant=False):
     """키워드 매칭(결정적) ∪ LLM 플래그(표에 없는 성분 보완). 순서 유지 중복 제거."""
+    flags = list(llm_flags or [])
+    if exclude_plant:
+        # LLM 플래그: 성분명 자체가 '식물성'인 항목(식물성크림·식물성유지)은 동물성에서 제외해요.
+        # 단, 이름은 동물성 후보이고 식물성크림을 캐리어로만 포함하는 항목(유산균 블렌드)은 유지돼요.
+        flags = [x for x in flags if PLANT_MARK not in _head(x)]
     result = []
-    for x in _match_ingredients(ingredients, keywords, exclude_plant) + list(llm_flags or []):
+    for x in _match_ingredients(ingredients, keywords, exclude_plant) + flags:
         if x not in result:
             result.append(x)
     return result
